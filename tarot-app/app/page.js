@@ -61,7 +61,7 @@ export default function Home() {
     setAiResult("타로 카드를 유심히 살펴보고 해석하는 중입니다... 🔮 잠시만 기다려주세요!");
 
     try {
-      const API_KEY = "NEXT_PUBLIC_GEMINI_API_KEY"; 
+      const API_KEY = "NEXT_PUBLIC_GEMINI"; 
       const ai = new GoogleGenAI({ apiKey: API_KEY });
 
       const promptText = `너는 전문적이고 따뜻한 타로 리더야. 질문과 나의 리딩, 카드 사진을 보고 알맞은 분량으로 피드백해줘.
