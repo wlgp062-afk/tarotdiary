@@ -7,8 +7,9 @@ const firebaseConfig = {
   authDomain: "tarot-diary-79838.firebaseapp.com",
   projectId: "tarot-diary-79838",
   storageBucket: "tarot-diary-79838.firebasestorage.app",
-  messagingSenderId: "여기에_진짜_messagingSenderId",
-  appId: "여기에_진짜_appId"
+  messagingSenderId: "360314638573",
+  appId: "1:360314638573:web:dcdc5f6e38151b4a5abce4",
+  measurementId: "G-C2M5ZC7YDL"
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
