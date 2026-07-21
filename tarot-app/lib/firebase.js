@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "여기에_파이어베이스_콘솔에서_복사한_진짜_apiKey를_넣으세요",
+  apiKey: "AIzaSyDZfZC-KhJpLygM0QdqQAxOHVo1ZupoXpA",
   authDomain: "tarot-diary-79838.firebaseapp.com",
   projectId: "tarot-diary-79838",
   storageBucket: "tarot-diary-79838.firebasestorage.app",
