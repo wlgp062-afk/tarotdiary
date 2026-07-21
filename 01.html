@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>나만의 타로 기록장</title>
+  <style>
+    body {
+      background-color: #f4f1ea;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+      font-family: 'Malgun Gothic', sans-serif;
+    }
+    .container {
+      background-color: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      max-width: 400px;
+      width: 100%;
+    }
+    h1 {
+      color: #4a3b52;
+      font-size: 24px;
+      text-align: center;
+    }
+    p {
+      color: #555;
+      font-size: 14px;
+    }
+    /* 텍스트 박스 디자인 수정 */
+    textarea {
+      width: 100%; /* 가로 길이를 100%로 꽉 채워서 라인 맞춤! */
+      box-sizing: border-box; /* 테두리 두께까지 포함해서 100%로 계산 */
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      resize: none; /* 사용자가 임의로 크기 조절 못하게 막기! */
+      overflow-y: auto; /* 내용이 길어지면 세로 스크롤바 생성! */
+    }
+    .btn-upload {
+      background-color: #e0dced;
+      color: #4a3b52;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      width: 100%;
+      box-sizing: border-box;
+      cursor: pointer;
+      font-weight: bold;
+      margin-bottom: 15px;
+    }
+    
+    .image-box {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+    
+    #imagePreview {
+      max-width: 100%; 
+      max-height: 300px;
+      border-radius: 8px;
+      display: none; 
+      transition: transform 0.3s ease;
+    }
+
+    #rotateBtn {
+      display: none; 
+      background-color: #fff;
+      border: 1px solid #ccc;
+      padding: 5px 15px;
+      border-radius: 20px;
+      margin-top: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .btn-ai {
+      background-color: #6b5b95;
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      width: 100%;
+      box-sizing: border-box;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    .btn-ai:hover {
+      background-color: #554877;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔮 나의 타로 기록장</h1>
+    <p style="text-align: center;">타로 카드를 뽑고, 직접 리딩을 적어보세요.<br>AI가 검증해 드립니다!</p>
+    
+    <p><b>1. 타로카드 사진 올리기</b></p>
+    <input type="file" accept="image/*" class="btn-upload" onchange="resizeAndPreview(event)">
+    
+    <div class="image-box">
+      <img id="imagePreview" alt="타로카드 미리보기">
+      <br>
+      <button id="rotateBtn" onclick="rotateImage()">🔄 사진 회전하기</button>
+    </div>
+
+    <p><b>2. 질문과 나의 리딩 적기</b></p>
+    <!-- 질문 칸은 2줄로 고정, 리딩 칸은 5줄로 고정하되 길어지면 스크롤됨 -->
+    <textarea rows="2" placeholder="어떤 질문을 하셨나요? (예: 오늘 나의 금전운은?)"></textarea>
+    <textarea rows="5" placeholder="내가 해석한 리딩 결과를 적어주세요."></textarea>
+
+    <p><b>3. AI에게 물어보기</b></p>
+    <button class="btn-ai">AI 리딩 검증받기 🤖</button>
+  </div>
+
+  <script>
+    let currentRotation = 0;
+
+    function resizeAndPreview(event) {
+      var file = event.target.files[0];
+      if (!file) return;
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+          var canvas = document.createElement('canvas');
+          var MAX_WIDTH = 800; 
+          var width = img.width;
+          var height = img.height;
+
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+          canvas.width = width;
+          canvas.height = height;
+
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          var dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+          var output = document.getElementById('imagePreview');
+          output.src = dataUrl;
+          output.style.display = 'inline-block';
+          
+          document.getElementById('rotateBtn').style.display = 'inline-block';
+          currentRotation = 0; 
+          output.style.transform = 'rotate(0deg)';
+        }
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function rotateImage() {
+      currentRotation += 90; 
+      if (currentRotation >= 360) currentRotation = 0; 
+      
+      var output = document.getElementById('imagePreview');
+      output.style.transform = 'rotate(' + currentRotation + 'deg)';
+    }
+  </script>
+</body>
+</html>
