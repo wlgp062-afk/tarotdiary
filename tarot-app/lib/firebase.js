@@ -3,12 +3,13 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDZfZC-KhJpLygM0QdQqAXOHVo1ZupoXpA",
+  authDomain: "tarot-diary-79838.firebaseapp.com",
+  projectId: "tarot-diary-79838",
+  storageBucket: "tarot-diary-79838.appspot.com",
+  messagingSenderId: "360314638573",
+  appId: "1:360314638573:web:dcdc5f6e38151b4a5abce4",
+  measurementId: "G-C2M5ZC7YDL"
 };
 
 const app = initializeApp(firebaseConfig);
