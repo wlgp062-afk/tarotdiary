@@ -1,9 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { auth, googleProvider, db } from '../lib/firebase'; // 파이어베이스 설정 파일 경로에 맞게 수정하세요
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { collection, addDoc, getDocs, deleteDoc, doc, query, where, orderBy } from 'firebase/firestore';
 
 export default function Home() {
+  const [user, setUser] = useState(null); // 로그인한 유저 정보
   const [currentView, setCurrentView] = useState('main');
   const [imageSrc, setImageSrc] = useState(null);
   const [rotation, setRotation] = useState(0);
@@ -13,9 +17,63 @@ export default function Home() {
   const [records, setRecords] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
 
-  // 페이지네이션 상태 (한 페이지에 8개씩)
+  // 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+
+  // 1. 로그인 상태 감지 및 데이터 불러오기
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        await fetchRecords(currentUser.uid);
+      } else {
+        setRecords([]);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 구글 로그인 실행
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("로그인 실패:", error);
+      alert("로그인 중 문제가 발생했습니다.");
+    }
+  };
+
+  // 로그아웃 실행
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      resetForm();
+      setCurrentView('main');
+    } catch (error) {
+      console.error("로그아웃 실패:", error);
+    }
+  };
+
+  // Firestore에서 내 기록만 불러오기 (유저 UID 기반 격리)
+  const fetchRecords = async (uid) => {
+    try {
+      const q = query(
+        collection(db, "tarotRecords"),
+        where("uid", "==", uid)
+      );
+      const querySnapshot = await getDocs(q);
+      const loadedRecords = [];
+      querySnapshot.forEach((docSnap) => {
+        loadedRecords.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      // 최신순 정렬 (클라이언트 단 정렬)
+      loadedRecords.sort((a, b) => b.rawDate - a.rawDate);
+      setRecords(loadedRecords);
+    } catch (error) {
+      console.error("기록 불러오기 실패:", error);
+    }
+  };
 
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
@@ -53,6 +111,11 @@ export default function Home() {
   };
 
   const handleAiSubmit = async () => {
+    if (!user) {
+      alert("로그인이 필요한 서비스입니다!");
+      handleGoogleLogin();
+      return;
+    }
     if (!question) {
       alert("질문을 입력해주세요!");
       return;
@@ -64,13 +127,13 @@ export default function Home() {
       const API_KEY = process.env.NEXT_PUBLIC_GEMINI;
       const ai = new GoogleGenAI({ apiKey: API_KEY });
 
-      const promptText = `너는 냉철하고 직관적인 타로 마스터야. 질문과 나의 리딩, 카드 사진을 보고 알맞은 분량으로 미사여구 없이 현실을 직시하게 해주는 날카롭고 직관적인 피드백해줘. 
+      const promptText = `너는 냉철하고 직관적인 타로 마스터야. 질문과 나의 리딩, 카드 사진을 보고 알맞은 분량으로 미사여구 없이 현실을 직시하게 해주는 날카롭고 직관적이면서 적당히 칭찬도 섞어서 피드백해줘. 
 **중요: 별표(*), 샵(#), 대시(-) 같은 마크다운 특수문자는 절대 사용하지 말고, 오직 일반 텍스트 문장과 줄바꿈만 사용해서 깔끔하게 작성해줘.**
 
 다음 양식으로 작성해줘:
 1. 내 리딩 피드백: (리딩에 대한 평가와 핵심 조언)
 2. 카드별 의미: (카드들의 핵심 의미 정리)
-3. 종합 총평 및 조언: (3. 종합 총평 및 조언: (따끔한 조언)
+3. 종합 총평 및 조언: (따끔한 조언)
 
 질문: ${question}
 나의 리딩: ${reading || '아직 리딩을 적지 못했어.'}`;
@@ -88,7 +151,7 @@ export default function Home() {
       }
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: contentsArray,
       });
 
@@ -98,8 +161,10 @@ export default function Home() {
       const now = new Date();
       const dateString = `${now.getFullYear()}.${now.getMonth() + 1}.${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-      const newRecord = {
-        id: Date.now(),
+      // Firestore에 저장할 데이터 객체 (uid 포함하여 유저별 격리)
+      const newRecordData = {
+        uid: user.uid,
+        rawDate: Date.now(),
         date: dateString,
         imageSrc: imageSrc,
         rotation: rotation,
@@ -108,7 +173,12 @@ export default function Home() {
         aiComment: aiComment
       };
 
-      setRecords([newRecord, ...records]);
+      // Firestore DB에 추가
+      const docRef = await addDoc(collection(db, "tarotRecords"), newRecordData);
+      
+      const savedRecord = { id: docRef.id, ...newRecordData };
+
+      setRecords([savedRecord, ...records]);
       setCurrentPage(1);
       setAiResult(aiComment); 
 
@@ -125,10 +195,16 @@ export default function Home() {
     setAiResult(null);
   };
 
-  const deleteRecord = (id, event) => {
+  const deleteRecord = async (id, event) => {
     event.stopPropagation();
     if(confirm("정말 이 기록을 삭제할까요?")) {
-      setRecords(records.filter(record => record.id !== id));
+      try {
+        await deleteDoc(doc(db, "tarotRecords", id));
+        setRecords(records.filter(record => record.id !== id));
+      } catch (error) {
+        console.error("삭제 실패:", error);
+        alert("삭제 중 오류가 발생했습니다.");
+      }
     }
   };
 
@@ -138,11 +214,29 @@ export default function Home() {
   const currentRecords = records.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(records.length / itemsPerPage);
 
+  // 로그인하지 않은 경우 로그인 화면 제공
+  if (!user) {
+    return (
+      <div style={styles.background}>
+        <div style={{...styles.container, textAlign: 'center', justifyContent: 'center', minHeight: '350px'}}>
+          <h1 style={styles.title}>🌙 오늘의 타로 리딩</h1>
+          <p style={{ color: '#666', marginBottom: '20px' }}>나만의 소중한 타로 기록을 안전하게 보관하세요.</p>
+          <button onClick={handleGoogleLogin} style={styles.primaryBtn}>
+            🔵 구글 계정으로 로그인하기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (currentView === 'main') {
     return (
       <div style={styles.background}>
         <div style={styles.container}>
-          <h1 style={styles.title}>🌙 오늘의 타로 리딩</h1>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '15px', marginBottom: '10px' }}>
+            <h1 style={{ ...styles.title, border: 'none', padding: '0', margin: '0' }}>🌙 타로 리딩</h1>
+            <button onClick={handleLogout} style={styles.logoutBtn}>로그아웃</button>
+          </div>
           
           <div>
             <p style={styles.label}>1. 뽑은 카드 사진 (선택)</p>
@@ -201,7 +295,10 @@ export default function Home() {
   return (
     <div style={styles.background}>
       <div style={styles.container}>
-        <h1 style={styles.title}>📚 지난 피드백 기록장</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '15px', marginBottom: '10px' }}>
+          <h1 style={{ ...styles.title, border: 'none', padding: '0', margin: '0' }}>📚 지난 기록장</h1>
+          <button onClick={handleLogout} style={styles.logoutBtn}>로그아웃</button>
+        </div>
         
         <button onClick={() => { setCurrentView('main'); resetForm(); }} style={styles.secondaryBtn}>
           ⬅️ 새로운 카드 리딩하기
@@ -303,9 +400,6 @@ const styles = {
     color: '#6b5b95',
     fontSize: '24px',
     textAlign: 'center',
-    margin: '0 0 10px 0',
-    borderBottom: '1px solid #eee',
-    paddingBottom: '15px',
     fontWeight: '800'
   },
   label: {
@@ -363,6 +457,16 @@ const styles = {
     fontSize: '15px',
     fontFamily: "'Pretendard', sans-serif" 
   },
+  logoutBtn: {
+    backgroundColor: 'transparent',
+    color: '#888',
+    border: '1px solid #ddd',
+    padding: '6px 12px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: 'bold'
+  },
   rotateBtn: {
     backgroundColor: '#fff', 
     border: '1px solid #ccc', 
@@ -413,7 +517,7 @@ const styles = {
     marginBottom: '5px'
   },
   detailText: {
-    margin: 0,
+    margin: '0',
     fontSize: '15px',
     lineHeight: '1.6',
     color: '#333'
