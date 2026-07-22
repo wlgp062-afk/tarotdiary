@@ -10,7 +10,6 @@ export default function Home() {
   const [user, setUser] = useState(null); // 로그인한 유저 정보
   const [currentView, setCurrentView] = useState('main');
   const [imageSrc, setImageSrc] = useState(null);
-  const [rotation, setRotation] = useState(0);
   const [question, setQuestion] = useState('');
   const [reading, setReading] = useState('');
   const [aiResult, setAiResult] = useState(null);
@@ -100,15 +99,34 @@ export default function Home() {
         ctx.drawImage(img, 0, 0, width, height);
 
         setImageSrc(canvas.toDataURL('image/jpeg', 0.8));
-        setRotation(0);
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
   };
 
+  // ⭐️ 수정: 화면에 보이는 것뿐 아니라 실제 이미지 픽셀 자체를 회전시켜서
+  // imageSrc를 완전히 교체함. 이렇게 해야 AI에게 보내는 이미지와 화면에 보이는
+  // 이미지, 저장되는 이미지가 전부 일치함 (기존엔 CSS로만 화면상 회전시켜서
+  // 실제 AI에게는 회전 전 원본이 그대로 전달되던 문제가 있었음).
   const rotateImage = () => {
-    setRotation((prev) => (prev + 90) % 360);
+    if (!imageSrc) return;
+
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      // 90도 회전이므로 가로/세로를 서로 바꿔줌
+      canvas.width = img.height;
+      canvas.height = img.width;
+
+      const ctx = canvas.getContext('2d');
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((90 * Math.PI) / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+      setImageSrc(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.src = imageSrc;
   };
 
   const handleAiSubmit = async () => {
@@ -129,8 +147,6 @@ export default function Home() {
       const API_KEY = process.env.NEXT_PUBLIC_GEMINI;
       const ai = new GoogleGenAI({ apiKey: API_KEY });
 
-      // ⭐️ 톤 수정: 냉철함은 유지하되, 잘한 부분을 구체적 근거와 함께 먼저 짚어주고
-      // 지적은 그 다음에, 마무리는 다음 리딩에 도움이 될 방향 제시로 끝나도록 구성
       const promptText = `너는 냉철하고 직관적인 타로 마스터야. 미사여구나 과장된 위로는 하지 않지만, 상대가 계속 리딩을 이어가고 싶어지도록 존중하는 태도를 유지해.
 
 피드백을 쓸 때 반드시 지켜:
@@ -180,7 +196,6 @@ export default function Home() {
         rawDate: Date.now(),
         date: dateString,
         imageSrc: imageSrc,
-        rotation: rotation,
         question: question,
         reading: reading,
         aiComment: aiComment
@@ -266,9 +281,7 @@ export default function Home() {
                 style={{
                   maxWidth: '100%',
                   maxHeight: '200px',
-                  borderRadius: '8px',
-                  transform: `rotate(${rotation}deg)`,
-                  transition: 'transform 0.3s ease'
+                  borderRadius: '8px'
                 }}
               />
               <br />
@@ -333,13 +346,6 @@ export default function Home() {
             currentRecords.map((record) => (
               <div key={record.id} style={styles.recordCard}>
                 <div style={styles.recordHeader} onClick={() => setExpandedId(expandedId === record.id ? null : record.id)}>
-                  {record.imageSrc && (
-                    <img
-                      src={record.imageSrc}
-                      alt="카드 썸네일"
-                      style={styles.thumbnail}
-                    />
-                  )}
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: '12px', color: '#888', margin: '0 0 4px 0' }}>{record.date}</p>
                     <p style={{ fontSize: '15px', fontWeight: 'bold', margin: 0, color: '#333' }}>Q. {record.question}</p>
@@ -356,8 +362,7 @@ export default function Home() {
                           style={{
                             maxWidth: '100%',
                             maxHeight: '150px',
-                            borderRadius: '8px',
-                            transform: `rotate(${record.rotation}deg)`
+                            borderRadius: '8px'
                           }}
                         />
                       </div>
@@ -522,16 +527,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '12px',
     cursor: 'pointer',
-  },
-  thumbnail: {
-    width: '44px',
-    height: '44px',
-    objectFit: 'cover',
-    borderRadius: '6px',
-    flexShrink: 0,
-    border: '1px solid #eee'
   },
   deleteBtn: {
     background: 'none',
