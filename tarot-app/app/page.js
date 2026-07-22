@@ -151,7 +151,7 @@ export default function Home() {
       }
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-flash-latest',
         contents: contentsArray,
       });
 
