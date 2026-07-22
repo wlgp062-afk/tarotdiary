@@ -14,6 +14,7 @@ export default function Home() {
   const [question, setQuestion] = useState('');
   const [reading, setReading] = useState('');
   const [aiResult, setAiResult] = useState(null);
+  const [isLoading, setIsLoading] = useState(false); // AI 분석 로딩 상태
   const [records, setRecords] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
 
@@ -120,20 +121,32 @@ export default function Home() {
       alert("질문을 입력해주세요!");
       return;
     }
-    
+
+    setIsLoading(true);
     setAiResult("타로 카드를 유심히 살펴보고 해석하는 중입니다... 🔮 잠시만 기다려주세요!");
 
     try {
       const API_KEY = process.env.NEXT_PUBLIC_GEMINI;
       const ai = new GoogleGenAI({ apiKey: API_KEY });
 
-      const promptText = `너는 냉철하고 직관적인 타로 마스터야. 질문과 나의 리딩, 카드 사진을 보고 알맞은 분량으로 미사여구 없이 현실을 직시하게 해주는 날카롭고 직관적이면서 적당히 칭찬도 섞어서 피드백해줘. 
+      // ⭐️ 톤 수정: 냉철함은 유지하되, 잘한 부분을 구체적 근거와 함께 먼저 짚어주고
+      // 지적은 그 다음에, 마무리는 다음 리딩에 도움이 될 방향 제시로 끝나도록 구성
+      const promptText = `너는 냉철하고 직관적인 타로 마스터야. 미사여구나 과장된 위로는 하지 않지만, 상대가 계속 리딩을 이어가고 싶어지도록 존중하는 태도를 유지해.
+
+피드백을 쓸 때 반드시 지켜:
+1. 먼저 리딩에서 실제로 잘 포착한 부분을 구체적으로 짚어줘 (형식적인 칭찬 말고, 정확히 어떤 카드나 상징을 잘 읽었는지 근거를 들어서).
+2. 그다음 놓친 부분이나 안일했던 해석을 날카롭게 지적해.
+3. 마지막은 다음에 뭘 더 눈여겨보면 좋을지 구체적인 방향을 제시하며 마무리해 (질책으로 끝내지 말고).
+
+냉정한 분석과 존중하는 태도는 공존할 수 있어. 상대의 노력 자체는 인정하면서, 안일한 해석에는 타협하지 마.
+
 **중요: 별표(*), 샵(#), 대시(-) 같은 마크다운 특수문자는 절대 사용하지 말고, 오직 일반 텍스트 문장과 줄바꿈만 사용해서 깔끔하게 작성해줘.**
 
 다음 양식으로 작성해줘:
-1. 내 리딩 피드백: (리딩에 대한 평가와 핵심 조언)
-2. 카드별 의미: (카드들의 핵심 의미 정리)
-3. 종합 총평 및 조언: (따끔한 조언)
+1. 잘 짚은 부분: (구체적 근거와 함께 실제로 잘 읽은 부분)
+2. 놓친 부분: (안일했던 해석이나 놓친 상징에 대한 날카로운 지적)
+3. 카드별 의미: (카드들의 핵심 의미 정리)
+4. 다음 리딩을 위한 조언: (질책이 아닌, 다음에 눈여겨볼 방향 제시)
 
 질문: ${question}
 나의 리딩: ${reading || '아직 리딩을 적지 못했어.'}`;
@@ -175,16 +188,18 @@ export default function Home() {
 
       // Firestore DB에 추가
       const docRef = await addDoc(collection(db, "tarotRecords"), newRecordData);
-      
+
       const savedRecord = { id: docRef.id, ...newRecordData };
 
       setRecords([savedRecord, ...records]);
       setCurrentPage(1);
-      setAiResult(aiComment); 
+      setAiResult(aiComment);
 
     } catch (error) {
       console.error(error);
       setAiResult("앗! AI 연결에 문제가 발생했어요.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -237,7 +252,7 @@ export default function Home() {
             <h1 style={{ ...styles.title, border: 'none', padding: '0', margin: '0' }}>🌙 타로 리딩</h1>
             <button onClick={handleLogout} style={styles.logoutBtn}>로그아웃</button>
           </div>
-          
+
           <div>
             <p style={styles.label}>1. 뽑은 카드 사진 (선택)</p>
             <input type="file" accept="image/*" onChange={handleImageUpload} style={styles.fileInput} />
@@ -245,16 +260,16 @@ export default function Home() {
 
           {imageSrc && (
             <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-              <img 
-                src={imageSrc} 
-                alt="타로카드 미리보기" 
-                style={{ 
-                  maxWidth: '100%', 
-                  maxHeight: '200px', 
-                  borderRadius: '8px', 
-                  transform: `rotate(${rotation}deg)`, 
-                  transition: 'transform 0.3s ease' 
-                }} 
+              <img
+                src={imageSrc}
+                alt="타로카드 미리보기"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '200px',
+                  borderRadius: '8px',
+                  transform: `rotate(${rotation}deg)`,
+                  transition: 'transform 0.3s ease'
+                }}
               />
               <br />
               <button onClick={rotateImage} style={styles.rotateBtn}>🔄 사진 회전하기</button>
@@ -269,11 +284,16 @@ export default function Home() {
           <div>
             <p style={styles.label}>3. 나의 리딩</p>
             <textarea rows="4" value={reading} onChange={(e) => setReading(e.target.value)} placeholder="카드의 상징이나 직관을 바탕으로 본인이 먼저 리딩해 본 내용을 적어주세요." style={styles.textArea} />
+            <p style={styles.hintText}>💡 카드 이름과 그렇게 해석한 이유를 함께 적을수록 더 정확한 피드백을 받을 수 있어요.</p>
           </div>
 
           <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button onClick={handleAiSubmit} style={styles.primaryBtn}>
-              ✨ 내 리딩 확인받기 (AI 분석)
+            <button
+              onClick={handleAiSubmit}
+              disabled={isLoading}
+              style={{ ...styles.primaryBtn, opacity: isLoading ? 0.7 : 1, cursor: isLoading ? 'not-allowed' : 'pointer' }}
+            >
+              {isLoading ? '🔮 분석 중이에요...' : '✨ 내 리딩 확인받기 (AI 분석)'}
             </button>
             <button onClick={() => setCurrentView('history')} style={styles.secondaryBtn}>
               📚 지난 피드백 기록장 보기
@@ -284,7 +304,9 @@ export default function Home() {
             <div style={{...styles.detailBox, backgroundColor: '#f0ecf9', border: '1px solid #dcd3ef', marginTop: '10px'}}>
               <span style={{...styles.detailLabel, color: '#6b5b95'}}>🤖 AI 맞춤 피드백</span>
               <p style={{...styles.detailText, color: '#4a3b52', marginBottom: '15px', whiteSpace: 'pre-wrap'}}>{aiResult}</p>
-              <button onClick={resetForm} style={styles.secondaryBtn}>🔄 새로운 리딩 준비하기</button>
+              {!isLoading && (
+                <button onClick={resetForm} style={styles.secondaryBtn}>🔄 새로운 리딩 준비하기</button>
+              )}
             </div>
           )}
         </div>
@@ -299,7 +321,7 @@ export default function Home() {
           <h1 style={{ ...styles.title, border: 'none', padding: '0', margin: '0' }}>📚 지난 기록장</h1>
           <button onClick={handleLogout} style={styles.logoutBtn}>로그아웃</button>
         </div>
-        
+
         <button onClick={() => { setCurrentView('main'); resetForm(); }} style={styles.secondaryBtn}>
           ⬅️ 새로운 카드 리딩하기
         </button>
@@ -311,6 +333,13 @@ export default function Home() {
             currentRecords.map((record) => (
               <div key={record.id} style={styles.recordCard}>
                 <div style={styles.recordHeader} onClick={() => setExpandedId(expandedId === record.id ? null : record.id)}>
+                  {record.imageSrc && (
+                    <img
+                      src={record.imageSrc}
+                      alt="카드 썸네일"
+                      style={styles.thumbnail}
+                    />
+                  )}
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: '12px', color: '#888', margin: '0 0 4px 0' }}>{record.date}</p>
                     <p style={{ fontSize: '15px', fontWeight: 'bold', margin: 0, color: '#333' }}>Q. {record.question}</p>
@@ -322,14 +351,14 @@ export default function Home() {
                   <div style={styles.recordDetails}>
                     {record.imageSrc && (
                       <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-                        <img 
-                          src={record.imageSrc} 
-                          style={{ 
-                            maxWidth: '100%', 
-                            maxHeight: '150px', 
-                            borderRadius: '8px', 
-                            transform: `rotate(${record.rotation}deg)` 
-                          }} 
+                        <img
+                          src={record.imageSrc}
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '150px',
+                            borderRadius: '8px',
+                            transform: `rotate(${record.rotation}deg)`
+                          }}
                         />
                       </div>
                     )}
@@ -351,7 +380,7 @@ export default function Home() {
         {/* 페이지네이션 버튼 영역 */}
         {totalPages > 1 && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '20px' }}>
-            <button 
+            <button
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
               style={{ ...styles.pageBtn, opacity: currentPage === 1 ? 0.5 : 1 }}
@@ -361,7 +390,7 @@ export default function Home() {
             <span style={{ alignSelf: 'center', fontSize: '14px', fontWeight: 'bold' }}>
               {currentPage} / {totalPages}
             </span>
-            <button 
+            <button
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
               style={{ ...styles.pageBtn, opacity: currentPage === totalPages ? 0.5 : 1 }}
@@ -382,7 +411,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     padding: '20px',
-    fontFamily: "'Pretendard', sans-serif" 
+    fontFamily: "'Pretendard', sans-serif"
   },
   container: {
     backgroundColor: 'white',
@@ -414,7 +443,7 @@ const styles = {
     borderRadius: '6px',
     width: '100%',
     boxSizing: 'border-box',
-    fontFamily: "'Pretendard', sans-serif" 
+    fontFamily: "'Pretendard', sans-serif"
   },
   textInput: {
     width: '100%',
@@ -422,7 +451,7 @@ const styles = {
     padding: '12px',
     border: '1px solid #ddd',
     borderRadius: '6px',
-    fontFamily: "'Pretendard', sans-serif" 
+    fontFamily: "'Pretendard', sans-serif"
   },
   textArea: {
     width: '100%',
@@ -431,7 +460,12 @@ const styles = {
     border: '1px solid #ddd',
     borderRadius: '6px',
     resize: 'vertical',
-    fontFamily: "'Pretendard', sans-serif" 
+    fontFamily: "'Pretendard', sans-serif"
+  },
+  hintText: {
+    fontSize: '12px',
+    color: '#999',
+    margin: '6px 2px 0 2px'
   },
   primaryBtn: {
     backgroundColor: '#6b5b95',
@@ -443,7 +477,7 @@ const styles = {
     cursor: 'pointer',
     fontWeight: '700',
     fontSize: '16px',
-    fontFamily: "'Pretendard', sans-serif" 
+    fontFamily: "'Pretendard', sans-serif"
   },
   secondaryBtn: {
     backgroundColor: '#f0f0f0',
@@ -455,7 +489,7 @@ const styles = {
     cursor: 'pointer',
     fontWeight: '700',
     fontSize: '15px',
-    fontFamily: "'Pretendard', sans-serif" 
+    fontFamily: "'Pretendard', sans-serif"
   },
   logoutBtn: {
     backgroundColor: 'transparent',
@@ -468,14 +502,14 @@ const styles = {
     fontWeight: 'bold'
   },
   rotateBtn: {
-    backgroundColor: '#fff', 
-    border: '1px solid #ccc', 
+    backgroundColor: '#fff',
+    border: '1px solid #ccc',
     padding: '6px 12px',
-    borderRadius: '20px', 
-    marginTop: '10px', 
-    cursor: 'pointer', 
+    borderRadius: '20px',
+    marginTop: '10px',
+    cursor: 'pointer',
     fontSize: '13px',
-    fontFamily: "'Pretendard', sans-serif" 
+    fontFamily: "'Pretendard', sans-serif"
   },
   recordCard: {
     border: '1px solid #eaeaea',
@@ -488,14 +522,25 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: '12px',
     cursor: 'pointer',
+  },
+  thumbnail: {
+    width: '44px',
+    height: '44px',
+    objectFit: 'cover',
+    borderRadius: '6px',
+    flexShrink: 0,
+    border: '1px solid #eee'
   },
   deleteBtn: {
     background: 'none',
     border: 'none',
-    fontSize: '18px',
+    fontSize: '16px',
     cursor: 'pointer',
-    padding: '5px'
+    padding: '5px',
+    opacity: 0.5,
+    marginLeft: '8px'
   },
   recordDetails: {
     padding: '15px',
@@ -519,7 +564,7 @@ const styles = {
   detailText: {
     margin: '0',
     fontSize: '15px',
-    lineHeight: '1.6',
+    lineHeight: '1.7',
     color: '#333'
   },
   pageBtn: {
